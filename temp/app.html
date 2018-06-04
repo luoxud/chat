@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+	<title>Document</title>
+	<style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      .edit-form { background: #333; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      .edit-form-input { margin-right: 65px; }
+      .edit-form input { border: 0; padding: 10px; width: 100%; }
+      .edit-form button { width: 60px; background: rgb(130, 224, 255); border: none; padding: 10px;position: absolute;right: 0;top: 3px;margin-right: 5px; }
+      .clearfix:after {
+      	content: '';
+      	display: block;
+      	clear: both;
+      }
+      #messages { list-style-type: none; margin: 0; padding: 0;margin-bottom: 45px; }
+      #messages li { padding: 5px 10px;margin: 10px 0; }
+      #messages li .pic { float: left;width: 30px;height: 30px;border-radius: 50%;overflow: hidden;margin-right: 5px; }
+      #messages li .pic img { width: 100%; height: 100%; }
+      #messages li .text { float: left;padding: 9px 0; }
+      #messages li.pic-right .pic { float: right; }
+      #messages li.pic-right .text { float: right; }
+      #messages li.pic-right .pic { float: right;margin: 0;margin-left: 5px; }
+      .login {
+      	position: fixed;top: 0;left: 0;background-color: rgba(0, 0, 0, .5);width: 100%;height: 100%;
+      }
+      .login .login-inner {
+      	width: 500px;height: 360px;position: absolute;left: 50%;top: 50%;background-color: #fff;transform: translate(-50%, -50%);padding: 20px;border-radius: 5px;box-shadow: 8px 5px 10px #666;
+      }
+      .login h2 { text-align: center;font-size: 30px; }
+      .login form {
+      	overflow: hidden;margin-top: 50px;
+      }
+      .login label { margin-bottom: 10px;display: block;width: 100%; }
+      .login form .form-attr {
+      	float: left;padding: 11px 0;margin-right: 10px;width: 100px;
+      }
+      .login form .form-input {
+      	float: left;
+      }
+      .login form .form-input input { padding: 10px 5px;border: 1px solid #ddd;outline: none;text-indent: 5px;width: 250px; }
+      .login .form-pic-item { display: inline-block;width: 35px;height: 35px;border-radius: 50%;overflow: hidden;margin-right: 10px;position: relative;cursor: pointer; }
+      .login .form-pic-item img { width: 100%;height: 100%; }
+      .login .form-pic-item.active:after {
+      	content: '';
+      	display: block;
+      	position: absolute;
+      	left: 0;top: 0;width: 100%;height: 100%;background-color: rgba(0, 0, 0, .5);
+      }
+      .login button { display: block;width: 100px;height: 30px;margin: 40px auto; }
+      .type-2 { text-align: center; }
+      .type-2 p { display: inline-block;padding: 5px 10px;background-color: #ddd;color: #fff; }
+      .type-1 .name { color: #ddd; }
+      @media screen and (max-width: 680px) {
+      	.login .login-inner { width: 300px; }
+      	.login form .form-input input { width: 150px; }
+      }
+    </style>
+    
+</head>
+<body>
+	<div id="app" ref="app" style="display: none;">
+		<ul id="messages">
+			<li class="clearfix" v-for="item in messageList" :class="item.userType === 2 ? 'pic-right' : ''">
+				<div class="type-1" v-if="item.type === 1">
+					<p class="name" v-if="item.userName !== startResultBo.userName">{{item.userName}}</p>
+					<div class="clearfix">
+						<div class="pic">
+							<img :src="item.avater ? item.avater : '/images/avater-01.jpg'" alt="">
+						</div>
+						<div class="text">{{item.msg}}</div>
+					</div>
+				</div>
+				<div class="type-2" v-if="item.type === 2">
+					<p>{{item.msg}}</p>
+				</div>
+				
+			</li>
+	    </ul>
+	    <div class="edit-form">
+	    	<div class="edit-form-input">
+				<input v-model="sendValue" autocomplete="off" type="text" ref="sendInput" />
+	    	</div>
+			<button @click="sendMessage" type="button">发送</button>
+	    </div>
+	    <div class="login" v-if="layerBo.isLayer">
+			<div class="login-inner">
+				<h2>请填写个人信息</h2>
+				<form action="">
+					<label class="clearfix">
+						<div class="form-attr">你的名字</div>
+						<div class="form-input">
+							<input type="text" v-model="startBo.userName">
+						</div>
+					</label>
+					<!-- <label class="clearfix">
+						<div class="form-attr">请选择房间号</div>
+						<div class="form-input">
+							<input type="text" v-model="startBo.createId">
+						</div>
+					</label> -->
+					<label class="clearfix">
+						<div class="form-attr">请选择头像</div>
+						<div class="form-input">
+							<div class="form-pic-item" v-for="(item, index) in picList" @click="curPicIdx = index" :class="curPicIdx === index ? 'active' : ''">
+								<img :src="item" alt="">
+							</div>
+						</div>
+					</label>
+					<label>
+						<button type="button" @click="startChat">开始聊天</button>
+					</label>
+				</form>
+			</div>
+	    </div>
+	</div>
+	<script src="/js/vue.js"></script>
+	<script src="/js/socket.io.js"></script>
+	<script src="/js/jquery.min.js"></script>
+	<script src="/js/jquery.cookie.js"></script>
+	<script>
+		;(function () {
+			var app = new Vue({
+				el: '#app',
+				data: {
+					message: 'scoket',
+					startResultBo: {}, // 创建完个人信息之后当前用户信息
+					layerBo: {
+						isLayer: false
+					}, // layer弹窗Bo
+					socket: null, // scoket对象
+					sendValue: '', // 发送内容
+					picList: ['/images/avater-01.jpg', '/images/avater-02.jpg', '/images/avater-03.jpg'], // 头像url
+					curPicIdx: 0, // 默认图像选择
+					startBo: {
+						userName: '', // 用户名
+						createId: '', // 房间号
+						avater: '/images/avater-01.jpg' // 用户头像
+					}, // 开始前用户Bo
+					messageList: [] // message列表
+				},
+				watch: {
+					curPicIdx: function (idx) {
+						this.$set(this.startBo, 'avater', this.picList[idx])
+					},
+					messageList: function () {
+						setTimeout(function () {
+							$('body,html').animate({scrollTop: $('html').height() - window.innerHeight + 100}, 200)
+						}, 300)
+					}
+				},
+				mounted: function () {
+					var self = this;
+					this.$refs.app.style.display = 'block';
+					// 判断用户
+					this.checkUser();
+					this.$refs.sendInput.addEventListener('keydown', function (eve) {
+						if (eve.keyCode === 13) {
+							self.sendMessage();
+						}
+					}, false)
+				},
+				methods: {
+					/* 检验token是否失效 */
+					checkUser: function () {
+						var self = this;
+						$.ajax({
+							url: 'checkUser',
+							type: 'GET',
+							dataType: 'json',
+							success: function (res) {
+								// errorCode = 0 未失效
+								if (res.errorCode != 0) {
+									self.layerBo.isLayer = true;
+								} else {
+									// 初始化socket
+									self.socket = io();
+									self.updateMessage();
+									self.startResultBo = res.data;
+									self.getHistory(function () {
+										self.messageList.push({
+											msg: '欢迎回来' + res.data.userName + '，请继续你的表演',
+											type: 2 // 加入类型
+										})
+									});
+								}
+							}
+						})
+					},
+					getHistory: function (callback) {
+						var self = this;
+						$.ajax({
+							url: 'getHistory',
+							type: 'GET',
+							success: function (res) {
+								res.data = res.data.map(item => {
+									item.userType = item.userName === self.startResultBo.userName ? 2 : 1;
+									item.type = 1;
+									return item;
+								})
+								self.messageList = self.messageList.concat(res.data);
+								typeof callback === 'function' ? callback(res) : null;
+							}
+						})
+					},
+					startChat: function () {
+						var parmas = this.startBo,
+							self = this;
+						$.ajax({
+							url: '/startChat',
+							type: 'GET',
+							data: parmas,
+							dataType: 'json',
+							success: function (res) {
+								if (res.errorCode === 0) {
+									self.$set(self.layerBo, 'isLayer', false);
+									self.startResultBo = res.data;
+									// 初始化socket
+									self.socket = io();
+									self.socket.emit('loginIn', res.data)
+									self.updateMessage();
+									self.getHistory(function () {
+										self.messageList.push({
+											msg: '你加入了群聊，请开始你的表演',
+											type: 2 // 加入类型
+										})
+									});
+									// alert('登录成')
+								}
+							}
+						})
+					},
+					updateMessage: function () {
+						var socket = this.socket,self = this;
+						socket.on('connect', function () {
+							//加入聊天室  
+							socket.on('loginInServer', function(res) {  
+								self.messageList.push({
+									msg: res.userName + '加入了群聊',
+									type: 2 // 加入类型
+								})
+							});  
+							//离开聊天室  
+							socket.on('loginOutServer', function(msg) {  
+							});  
+							//获取消息  
+							socket.on('messageServer', function(res) {
+								// 失效或者错误
+								if (res.errorCode === -1) {
+									window.location.reload();
+								} else {
+									if ('noMsg' in res) return;
+									self.messageList.push({
+										msg: res.value,
+										userName: res.userName,
+										type: 1, // 普通类型
+										avater: res.avater,
+										userType: 1 // userType = 1 = 接受别人的消息
+									})
+								}
+							});  
+					    });
+					},
+					sendMessage: function () {
+						if (!this.sendValue) return;
+						this.socket.emit('messageClient', {
+							cookie: $.cookie('startToken'),
+							value: this.sendValue
+						});
+						this.messageList.push({
+							msg: this.sendValue,
+							type: 1, // 普通类型
+							avater: this.startResultBo.avater,
+							userType: 2 // userType = 2 = 自己的消息
+						})
+						this.sendValue = '';
+					}
+				}
+			})
+		})()
+	</script>
+</body>
+</html>
